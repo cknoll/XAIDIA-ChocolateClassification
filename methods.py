@@ -85,6 +85,7 @@ class CustomImageDataset(Dataset):
     def get_labels(self):
         return self.labels
 
+# refer to https://discuss.pytorch.org/t/imbalanceddatasetsampler-dataloader-sampler/143996
 class CustomImbalancedDatasetSampler(Sampler):
     def __init__(self, dataset, indices=None, num_samples=None):
         self.dataset = dataset
@@ -119,7 +120,7 @@ class CustomImbalancedDatasetSampler(Sampler):
 
 def training_loop(model, num_epochs, criterion, optimizer, train_loader, val_loader, device):
     # Training loop
-    num_epochs = 50
+    # num_epochs = 50
     train_losses = []
     val_losses = []
 
@@ -178,7 +179,7 @@ def training_loop(model, num_epochs, criterion, optimizer, train_loader, val_loa
 
         print(f'Epoch {epoch+1}, Train Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%')
 
-    avg_val_loss, val_losses, val_accuracy, train_losses, cm, misclassified_images
+    return avg_val_loss, val_losses, val_accuracy, train_losses, cm, misclassified_images
 
 # Function to plot histogram and scatter plot using Bokeh
 def plot_histogram_and_scatter(dataset, dc=None):
@@ -231,7 +232,7 @@ def plot_histogram_and_scatter(dataset, dc=None):
     if dc is not None:
         dc.fetch_locals()
 
-# Define the CNN model
+# Define the CNN model 
 class ChocolateCNN(nn.Module):
     def __init__(self):
         super(ChocolateCNN, self).__init__()
@@ -259,6 +260,33 @@ class ChocolateCNN(nn.Module):
         # x = self.softmax(x)
         return x
 
+# Define the CNN model- new model
+class ChocolateCNN2(nn.Module):
+    def __init__(self):
+        super(ChocolateCNN2, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)  # New Convolutional Layer
+        self.bn3 = nn.BatchNorm2d(128)  # Batch Normalization for the new layer
+        self.fc1 = nn.Linear(128 * 12 * 3, 512)  # Adjust input size according to new layer's output
+
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(512, 5)
+
+    def forward(self, x):
+        x = nn.ReLU()(self.bn1(self.conv1(x)))
+        x = nn.MaxPool2d(kernel_size=2, stride=2)(x)
+        x = nn.ReLU()(self.bn2(self.conv2(x)))
+        x = nn.MaxPool2d(kernel_size=2, stride=2)(x)
+        x = nn.ReLU()(self.bn3(self.conv3(x)))  # Apply the new layer
+        x = nn.MaxPool2d(kernel_size=2, stride=2)(x)
+        x = x.view(-1, 128 * 12 * 3)  # Flatten the tensor, adjust based on input size
+        x = nn.ReLU()(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 # Function to plot confusion matrix
 def plot_confusion_matrix(cm, class_names):
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -306,7 +334,7 @@ def show_misclassified_images(misclassified_images, num_images=20):
         plt.imshow(image)
         plt.title(f"File: {os.path.basename(info['filename'])}\n"
                   f"True: {info['label']}, Pred: {info['predicted']}\n"
-                  f"Score: {info['score']}", fontsize=10)  # Smaller font size for filenames
+                  f"Score: {info['score']}", fontsize=10) 
         plt.axis('off')
     # plt.tight_layout()
     plt.show()
@@ -318,11 +346,11 @@ def show_misclassified_images1(misclassified_images, num_images=20):
     for i, info in enumerate(misclassified_images[:num_images]):
         ax = axes[i // 4, i % 4]
         image = info['image'].permute(1, 2, 0).numpy()  # Convert from (C, H, W) to (H, W, C)
-        ax.imshow(image, aspect='auto')  # Ensure aspect ratio is preserved
+        ax.imshow(image, aspect='auto')  
         ax.set_aspect('equal')
         ax.set_title(f"File: {os.path.basename(info['filename'])}\n"
                      f"True: {info['label']}, Pred: {info['predicted']}\n"
-                     f"Score: {info['score']}", fontsize=10)  # Smaller font size for filenames
+                     f"Score: {info['score']}", fontsize=10) 
         ax.axis('off')
 
     plt.tight_layout()
@@ -448,7 +476,7 @@ def load_model_with_metadata(load_path, device):
 
 def show_common_misclassified_images(common_misclassified_images, misclassified_details, model_paths, num_images=20):
     rows = (num_images + 3) // 4  # Calculate the number of rows needed
-    plt.figure(figsize=(20, rows * 5))  # Adjust figure size accordingly
+    plt.figure(figsize=(20, rows * 5))  
 
     for i, filename in enumerate(list(common_misclassified_images)[:num_images]):
         plt.subplot(rows, 4, i + 1)  # Arrange in a grid of 4 columns
