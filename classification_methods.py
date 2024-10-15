@@ -23,6 +23,8 @@ import torch.nn.functional as F
 from PIL import Image
 import cv2
 from sklearn.metrics import confusion_matrix
+from mlcm import mlcm
+import seaborn as sns
 
 def read_and_combine_csvs(folder_path):
     all_data = []
@@ -478,6 +480,23 @@ def plot_multi_label_confusion_matrix(labels, predictions, class_names):
         for (j, k), val in np.ndenumerate(cm):
             ax.text(k, j, f'{val}', ha='center', va='center', color='red')
 
+    plt.tight_layout()
+    plt.show()
+
+def plot_mlcm(matrix_to_plot, label_names):
+    # Create a heatmap with seaborn
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(matrix_to_plot, annot=True, fmt='g', cmap='Blues', xticklabels=label_names, yticklabels=label_names)
+
+    # Set labels, title, and axis ticks
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title('Confusion Matrix')
+
+    # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45, ha='right')
+
+    # Show the plot
     plt.tight_layout()
     plt.show()
 
