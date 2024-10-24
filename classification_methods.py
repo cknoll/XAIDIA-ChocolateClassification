@@ -38,7 +38,7 @@ def read_and_combine_csvs(folder_path):
                 all_data.append(df)
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
-    
+
     # Concatenate all data into a single DataFrame
     if all_data:  # Make sure there's data to concatenate
         combined_df = pd.concat(all_data, ignore_index=True)
@@ -49,22 +49,22 @@ def read_and_combine_csvs(folder_path):
 
 def read_csvs_by_group(folder_path):
     group_data = {}
-    
+
     # Loop through all files in the directory
     for filename in os.listdir(folder_path):
         if filename.startswith('assigned_classes_grp') and filename.endswith('.csv'):
             file_path = os.path.join(folder_path, filename)
-            
+
             # Extract group number from filename
             group_number = int(filename.split('_grp')[-1].split('.')[0])
-            
+
             try:
                 # Read the CSV file
                 df = pd.read_csv(file_path, encoding='ISO-8859-1')
                 group_data[group_number] = df
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
-                
+
     print(f"Total groups read: {len(group_data)}")
     return group_data
 
@@ -79,7 +79,7 @@ class CustomImageDatasetFromCSV(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        img_name = self.df.iloc[idx, 0] 
+        img_name = self.df.iloc[idx, 0]
         # Search for the image in subfolders
         img_path = None
         for subdir, _, files in os.walk(self.root_dir):
@@ -91,20 +91,20 @@ class CustomImageDatasetFromCSV(Dataset):
             raise FileNotFoundError(f"Image {img_name} not found in any subfolder of {self.root_dir}")
 
         image = Image.open(img_path).convert("RGB")
-        
+
         # Get labels (assuming the rest of the columns are the labels)
         labels = self.df.iloc[idx, 1:].values.astype('float')
-        
+
         if self.transform:
             image = self.transform(image)
-        
+
         return image, labels
 
 def plot_histograms_for_groups(group_data):
     for group_number, df in group_data.items():
         # Sum the frequency of each label
         label_frequencies = df.iloc[:, 1:].sum()
-        
+
         # Plot the histogram for the group
         plt.figure(figsize=(12, 6))
         label_frequencies.plot(kind='bar')
@@ -117,12 +117,12 @@ def plot_histograms_for_groups(group_data):
 def extract_label_frequencies(group_data):
     # Dictionary to store label frequencies for each label across all groups
     label_frequencies_by_group = {label: [] for label in group_data[1].columns[1:]}
-    
+
     for group_number, df in group_data.items():
         label_frequencies = df.iloc[:, 1:].sum()
         for label, frequency in label_frequencies.items():
             label_frequencies_by_group[label].append(frequency)
-    
+
     return label_frequencies_by_group
 
 # refer to https://plotly.com/python/box-plots/
@@ -135,16 +135,16 @@ def plot_interactive_box_plot(label_frequencies_by_group):
 
     # Create the interactive box plot
     fig = px.box(pd.DataFrame(data), x='Label', y='Frequency', points="all")
-    
+
     fig.update_layout(
         title="Distribution of Label Frequencies Across Groups",
         xaxis_title="Labels",
         yaxis_title="Frequency",
         hovermode="closest",
         template="plotly_white",
-        height=800  
+        height=800
     )
-    
+
     # Show the plot
     fig.show()
 
@@ -183,7 +183,7 @@ class CustomImbalancedDatasetSampler(Sampler):
     def __len__(self):
         return len(self.indices)
 
-# Define the CNN model 
+# Define the CNN model
 class ChocolateCNN(nn.Module):
     def __init__(self):
         super(ChocolateCNN, self).__init__()
@@ -191,7 +191,7 @@ class ChocolateCNN(nn.Module):
         self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
-        self.fc1 = nn.Linear(64 * 25 * 6, 512)  
+        self.fc1 = nn.Linear(64 * 25 * 6, 512)
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(512, 9)  # 9 labels (for 9 classification categories)
 
@@ -224,23 +224,23 @@ class ImprovedCNN(nn.Module):
 
     def forward(self, x):
         x = self.bn1(F.relu(self.stem(x)))
-        x = F.max_pool2d(x, 2, stride=2) 
+        x = F.max_pool2d(x, 2, stride=2)
         x = self.bn2(F.relu(self.conv1(x)))
-        x = F.max_pool2d(x, 2, stride=2)         
+        x = F.max_pool2d(x, 2, stride=2)
         x = self.bn3(F.relu(self.conv2(x)))
-        # x = F.max_pool2d(x, 2, stride=2) 
-        x = F.max_pool2d(x, (2, 1), stride=(2, 1)) 
+        # x = F.max_pool2d(x, 2, stride=2)
+        x = F.max_pool2d(x, (2, 1), stride=(2, 1))
         x = self.dropout1(x)
-        x = F.adaptive_avg_pool2d(x, (1, 1)) 
+        x = F.adaptive_avg_pool2d(x, (1, 1))
         x = torch.flatten(x, 1)
         x = self.fc1(x)
-        
+
         return x
 
 def get_data_loaders(image_dir, input_size, combined_df):
         # Define transforms for your dataset (resize to match model input size)
     transform = transforms.Compose([
-        transforms.Resize(input_size),  # Resize images 
+        transforms.Resize(input_size),  # Resize images
         transforms.ToTensor(),
     ])
 
@@ -354,7 +354,7 @@ def train_model1(device, model, train_loader, val_loader, num_epochs=20, learnin
 def save_model(model, optimizer, num_epochs, avg_train_loss, avg_val_loss, accuracy, hard_accuracy, train_losses, val_losses, cm, val_indices,misclassified_images, save_path):
     # Determine the model type based on the model's class name
     model_type = model.__class__.__name__  # This will get the class name like 'ChocolateCNN', 'ImprovedCNN', or 'ResNet50'
-    
+
     torch.save({
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
@@ -375,8 +375,8 @@ def save_model(model, optimizer, num_epochs, avg_train_loss, avg_val_loss, accur
     print(f"Model saved successfully as {model_type} at {save_path}")
 
 
-def load_model_with_metadata1(model_path, device):
-    checkpoint = torch.load(model_path, map_location=device)
+def load_model_with_metadata1(model_path, device, weights_only=None):
+    checkpoint = torch.load(model_path, map_location=device, weights_only=weights_only)
     model_type = checkpoint['model_type']
     print(model_type)
     print(model_type)
@@ -557,13 +557,13 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
         img = cv2.resize(img, (100, 400))  # Resize to (width=100, height=400)
 
         # Create a wider canvas with space for the text below the image
-        canvas_width = 400  
-        canvas_height = img.shape[0] + 100  
+        canvas_width = 400
+        canvas_height = img.shape[0] + 100
         canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255  # White background
 
         # Center the image on the canvas
         x_offset = (canvas_width - img.shape[1]) // 2
-        canvas[:img.shape[0], x_offset:x_offset + img.shape[1]] = img 
+        canvas[:img.shape[0], x_offset:x_offset + img.shape[1]] = img
 
         # Annotate with the predicted labels
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -649,7 +649,7 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 #         img_path = os.path.join(folder_path, image_file)
 #         img = cv2.imread(img_path)
 #         img = cv2.resize(img, (100, 400))  # Resize back to original size if needed
-        
+
 #         # Annotate the image with the predicted labels
 #         annotated_text = ", ".join([label for label, value in zip(labels_names, predicted_labels) if value == 1])
 #         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -659,7 +659,7 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 
 #         # Annotate with the predicted labels
 #         cv2.putText(img, f'Predicted: {annotated_text}', position, font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
-        
+
 #         # Display the image
 #         cv2.imshow('Predictions', img)
 
@@ -673,9 +673,3 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 #     cv2.destroyAllWindows()
 
 #     return df
-
-
-
-
-
-    
