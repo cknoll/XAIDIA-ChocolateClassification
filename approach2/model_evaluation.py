@@ -110,7 +110,11 @@ class Manager:
 
 
         # Get list of image files in the folder
+        # filenames
         self.img_fnames_for_prediction = [f for f in os.listdir(self.input_image_dir_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+        # full paths
+        self.img_fpaths_for_prediction = [pjoin(self.input_image_dir_path, img_fname) for img_fname  in self.img_fnames_for_prediction]
         self.predictions = []
         self.outputs = []
         torch.set_printoptions(sci_mode=False, precision=4)
@@ -120,17 +124,15 @@ class Manager:
         self.model.to(device)
         self.model.eval()  # Set model to evaluation mode
 
-        for img_fname in tqdm.tqdm(self.img_fnames_for_prediction):
+        for i, img_fpath in tqdm.tqdm(enumerate(self.img_fpaths_for_prediction)):
             # Load and preprocess the image
 
-            img_fpath = pjoin(self.input_image_dir_path, img_fname)
-            image = Image.open(img_fpath).convert('RGB')
-            image = self.transform(image)
-            image = image.unsqueeze(0).to(device)  # Add batch dimension and move to device
+            img_fname = self.img_fnames_for_prediction[i]
+            image_tensor = self.load_and_preprocess_image(img_fpath)
 
             # Make prediction
             with torch.no_grad():
-                image_outputs = self.model(image)
+                image_outputs = self.model(image_tensor)
                 self.outputs.append(image_outputs)
                 predicted_probs = torch.sigmoid(image_outputs)  # Apply sigmoid for multi-label classification
                 # Format tensor output to 4 decimal places
@@ -152,6 +154,15 @@ class Manager:
                 res = self.display_prediction(img_fpath, annotated_text)
                 if res == "break":
                     break
+
+    def load_and_preprocess_image(self, img_fpath):
+        image = Image.open(img_fpath).convert('RGB')
+        return self.preprocess_image(image)
+
+    def preprocess_image(self, image):
+        res_tensor = self.transform(image)
+        res_tensor = res_tensor.unsqueeze(0).to(device)  # Add batch dimension and move to device
+        return res_tensor
 
 
     def display_prediction(self, img_path, annotated_text):
