@@ -164,6 +164,20 @@ class Manager:
         res_tensor = res_tensor.unsqueeze(0).to(device)  # Add batch dimension and move to device
         return res_tensor
 
+    def np_img_from_tensor(self, img_tensor) -> np.ndarray:
+        if len(img_tensor.shape) == 4:
+            assert img_tensor.shape[:2] == (1, 3)
+            img_tensor = img_tensor[0, :, :, :]
+        else:
+            assert len(img_tensor.shape) == 3
+            assert img_tensor.shape[:1] == (3,)
+
+            pass
+        img_np = img_tensor.cpu().numpy().transpose(1, 2, 0)
+        return img_np
+
+
+
 
     def display_prediction(self, img_path, annotated_text):
         img = cv2.imread(img_path)
