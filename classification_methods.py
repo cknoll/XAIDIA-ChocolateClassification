@@ -387,7 +387,7 @@ def load_model_with_metadata1(model_path, device, weights_only=None):
     elif model_type == 'ImprovedCNN':
         model_class = ImprovedCNN
         input_size = (100, 25)
-    elif model_type == 'ResNet50':
+    elif model_type == 'ResNet50' or 'ResNet':
         model_class = get_resnet50_model
         input_size = (224, 224)
     else:
@@ -483,15 +483,15 @@ def plot_multi_label_confusion_matrix(labels, predictions, class_names):
     plt.tight_layout()
     plt.show()
 
-def plot_mlcm(matrix_to_plot, label_names):
+def plot_mlcm(matrix_to_plot, label_names, title):
     # Create a heatmap with seaborn
     plt.figure(figsize=(10, 8))
-    sns.heatmap(matrix_to_plot, annot=True, fmt='g', cmap='Blues', xticklabels=label_names, yticklabels=label_names)
+    sns.heatmap(matrix_to_plot, annot=True, fmt='g', cmap='Blues', xticklabels=label_names+ ['NPL(No Predicted Label)'], yticklabels=label_names+ ['NTL(No True Label)'])
 
     # Set labels, title, and axis ticks
     plt.xlabel('Predicted Labels')
     plt.ylabel('True Labels')
-    plt.title('Confusion Matrix')
+    plt.title(title)
 
     # Rotate x-axis labels for better readability
     plt.xticks(rotation=45, ha='right')
@@ -517,12 +517,17 @@ def show_misclassified_images(misclassified_images, num_images=20):
     plt.tight_layout()
     plt.show()
 
-#   Make predictions on all images in a folder and save them as a CSV file.
-def make_predictions(model, device, folder_path, transform, labels_names, output_csv='predictions.csv'):
+
+def make_predictions(model, device, folder_path, transform, labels_names, output_csv='predictions.csv', save_images=True):
 
     # Get list of image files in the folder
     image_files = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
     predictions = []
+
+    # Create folders for each label (from 1 to 9) if save_images is True
+    if save_images:
+        for i in range(1, 10):  # Assuming there are 9 labels
+            os.makedirs(os.path.join(folder_path, str(i)), exist_ok=True)
 
     model.to(device)
     model.eval()  # Set model to evaluation mode
@@ -538,25 +543,37 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
         with torch.no_grad():
             outputs = model(image)
             predicted_probs = torch.sigmoid(outputs)  # Apply sigmoid for multi-label classification
-            # Format tensor output to 4 decimal places
-            torch.set_printoptions(sci_mode=False, precision=4)
-
-            print(predicted_probs)
-            predicted_labels = (predicted_probs > 0.5).int()  # Convert probabilities to binary predictions
+            # Convert probabilities to binary predictions
+            predicted_labels = (predicted_probs > 0.5).int()
 
         predicted_labels = predicted_labels.cpu().numpy().flatten()
 
         # Store the results
         predictions.append({'filename': image_file, **dict(zip(labels_names, predicted_labels))})
 
-        # Prepare the annotated text for the current image
-        annotated_text = ", ".join([label for label, value in zip(labels_names, predicted_labels) if value == 1])
+    # Convert the predictions to a DataFrame and save as CSV with proper encoding for German letters
+    df = pd.DataFrame(predictions)
+    df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+    print(f"Predictions saved to {output_csv}")
 
-        # Display the image with its annotated text
+    # Save the images in folders corresponding to each label (from 1 to 9)
+    if save_images:
+        for image_file, predicted_labels in zip(image_files, df[labels_names].values):
+            img_path = os.path.join(folder_path, image_file)
+            img = cv2.imread(img_path)
+            for i, is_present in enumerate(predicted_labels, 1):  # Labels indexed from 1 to 9
+                if is_present == 1:  # If the label is predicted as 1 for this image
+                    save_path = os.path.join(folder_path, str(i), image_file)
+                    cv2.imwrite(save_path, img)
+
+    # After saving CSV and images, display the images with predicted labels
+    for image_file, predicted_labels in zip(image_files, df[labels_names].values):
+        # Load the image and resize it
+        img_path = os.path.join(folder_path, image_file)
         img = cv2.imread(img_path)
         img = cv2.resize(img, (100, 400))  # Resize to (width=100, height=400)
 
-        # Create a wider canvas with space for the text below the image
+        # Create a canvas for the image and text
         canvas_width = 400
         canvas_height = img.shape[0] + 100
         canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255  # White background
@@ -566,6 +583,7 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
         canvas[:img.shape[0], x_offset:x_offset + img.shape[1]] = img
 
         # Annotate with the predicted labels
+        annotated_text = ", ".join([label for label, value in zip(labels_names, predicted_labels) if value == 1])
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.6
         thickness = 1
@@ -575,10 +593,10 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 
         cv2.putText(canvas, annotated_text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
 
-        # Display the image
+        # Display the image with the labels
         cv2.imshow('Predictions', canvas)
 
-        # Wait until the user presses a key
+        # Wait for the user to press a key
         key = cv2.waitKey(0)  # Wait indefinitely for a key press
         if key == ord('q'):  # Press 'q' to quit the display
             print("Display canceled by user.")
@@ -586,11 +604,6 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 
     # Close the OpenCV window
     cv2.destroyAllWindows()
-
-    # Convert the predictions to a DataFrame and save as CSV with proper encoding for German letters
-    df = pd.DataFrame(predictions)
-    df.to_csv(output_csv, index=False, encoding='utf-8-sig')
-    print(f"Predictions saved to {output_csv}")
 
     return df
 
