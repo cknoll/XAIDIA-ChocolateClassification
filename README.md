@@ -6,6 +6,12 @@ To install the dependencies needed, navigate to the project folder and run the f
 ```bash
 pip install -r requirements.txt
 ```
+
+## Reproduce Training
+
+
+
+
 ## Classification without manual labelling
 
 1. Place the _results folder containing the dataset in the project folder.
@@ -23,6 +29,6 @@ pip install -r requirements.txt
 7. The models will be saved to 'classification_models' folder.
 8. The inference results will be saved to 'predictions.csv'
 
-## Author
+## Authors
 
-Thomas Manjooran
+Thomas Manjooran, Carsten Knoll

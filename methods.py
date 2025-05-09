@@ -40,7 +40,7 @@ def get_label_from_filename(filename,classification):
         return 1
     elif classification[2] <= score < classification[3]:
         return 2
-        
+
     elif classification[3] <= score < classification[4]:
         return 3
     else:
@@ -81,7 +81,7 @@ class CustomImageDataset(Dataset):
     def print_labels(self, num_samples=5):
         for i in range(min(num_samples, len(self.image_files))):
             print(f"Filename: {self.image_files[i]}, Label: {self.labels[i]}")
-    
+
     def get_labels(self):
         return self.labels
 
@@ -160,7 +160,7 @@ def training_loop(model, num_epochs, criterion, optimizer, train_loader, val_loa
                 correct += (predicted == labels).sum().item()
                 all_labels.extend(labels.cpu().numpy())
                 all_predictions.extend(predicted.cpu().numpy())
-            
+
                 # Collect information on misclassified images
                 for i in range(len(images)):
                     if predicted[i] != labels[i]:
@@ -232,7 +232,8 @@ def plot_histogram_and_scatter(dataset, dc=None):
     if dc is not None:
         dc.fetch_locals()
 
-# Define the CNN model 
+# Define the CNN model
+# TODO: unify models from here with classification_methods.py
 class ChocolateCNN(nn.Module):
     def __init__(self):
         super(ChocolateCNN, self).__init__()
@@ -240,8 +241,8 @@ class ChocolateCNN(nn.Module):
         self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
-        self.fc1 = nn.Linear(64 * 25 * 6, 512) 
-        # self.fc1 = nn.Linear(64 * 6 * 26, 512) 
+        self.fc1 = nn.Linear(64 * 25 * 6, 512)
+        # self.fc1 = nn.Linear(64 * 6 * 26, 512)
 
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(512, 5)
@@ -334,7 +335,7 @@ def show_misclassified_images(misclassified_images, num_images=20):
         plt.imshow(image)
         plt.title(f"File: {os.path.basename(info['filename'])}\n"
                   f"True: {info['label']}, Pred: {info['predicted']}\n"
-                  f"Score: {info['score']}", fontsize=10) 
+                  f"Score: {info['score']}", fontsize=10)
         plt.axis('off')
     # plt.tight_layout()
     plt.show()
@@ -346,11 +347,11 @@ def show_misclassified_images1(misclassified_images, num_images=20):
     for i, info in enumerate(misclassified_images[:num_images]):
         ax = axes[i // 4, i % 4]
         image = info['image'].permute(1, 2, 0).numpy()  # Convert from (C, H, W) to (H, W, C)
-        ax.imshow(image, aspect='auto')  
+        ax.imshow(image, aspect='auto')
         ax.set_aspect('equal')
         ax.set_title(f"File: {os.path.basename(info['filename'])}\n"
                      f"True: {info['label']}, Pred: {info['predicted']}\n"
-                     f"Score: {info['score']}", fontsize=10) 
+                     f"Score: {info['score']}", fontsize=10)
         ax.axis('off')
 
     plt.tight_layout()
@@ -383,7 +384,7 @@ def evaluate_model1(model, dataloader, criterion, device):
             _, predicted = torch.max(outputs, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            
+
             all_labels.extend(labels.cpu().numpy())
             all_predictions.extend(predicted.cpu().numpy())
 
@@ -407,7 +408,7 @@ def evaluate_model1(model, dataloader, criterion, device):
 
 def save_model_with_metadata(
     model, optimizer, num_epochs, loss_function, avg_val_loss, val_accuracy,
-    model_class_name, score_classification, val_losses, train_losses, 
+    model_class_name, score_classification, val_losses, train_losses,
     additional_text, val_indices, misclassified_images, cm, save_path
 ):
     # Create a dictionary to store metadata
@@ -471,12 +472,12 @@ def load_model_with_metadata(load_path, device):
     print(f'Model Class: {model_class_name}')
     print(f'Score Classification: {score_classification}')
 
-    return (model, optimizer, num_epochs, loss_function, additional_text, valid_loss, 
+    return (model, optimizer, num_epochs, loss_function, additional_text, valid_loss,
             valid_accuracy, score_classification, misclassified_images, cm, val_indices, train_losses, val_losses)
 
 def show_common_misclassified_images(common_misclassified_images, misclassified_details, model_paths, num_images=20):
     rows = (num_images + 3) // 4  # Calculate the number of rows needed
-    plt.figure(figsize=(20, rows * 5))  
+    plt.figure(figsize=(20, rows * 5))
 
     for i, filename in enumerate(list(common_misclassified_images)[:num_images]):
         plt.subplot(rows, 4, i + 1)  # Arrange in a grid of 4 columns
@@ -487,14 +488,14 @@ def show_common_misclassified_images(common_misclassified_images, misclassified_
         for model_path in model_paths:
             for detail in misclassified_details[model_path][filename]['details']:
                 title += f"\n{os.path.basename(model_path)}, True: {detail['true']}, Pred: {detail['pred']}, Score: {detail['score']}"
-        plt.title(title, fontsize=10)  
+        plt.title(title, fontsize=10)
         plt.axis('off')
     plt.tight_layout()
     plt.show()
 
 def plot_losses(num_epochs, train_losses, val_losses, title='Training and Validation Loss Over Epochs'):
     epochs = range(1, num_epochs + 1)
-    
+
     plt.figure(figsize=(10, 6))
     plt.plot(epochs, train_losses, label='Training Loss')
     plt.plot(epochs, val_losses, label='Validation Loss')
@@ -503,4 +504,3 @@ def plot_losses(num_epochs, train_losses, val_losses, title='Training and Valida
     plt.title(title)
     plt.legend()
     plt.show()
-
