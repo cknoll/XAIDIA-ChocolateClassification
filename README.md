@@ -7,12 +7,15 @@ To install the dependencies needed, navigate to the project folder and run the f
 pip install -r requirements.txt
 ```
 
-## Reproduce Training
+
+## Important files not included in the repo:
+
+- `./results` (15 x 500 jpg-files)
+- `./classification_models/CNN_3.pth` (trained model)
+- `labels`; TODO: add explanation of label numbers
 
 
-
-
-## Classification without manual labelling
+## Training of Classification Model without manual labelling
 
 1. Place the _results folder containing the dataset in the project folder.
 2. Open the file `chocolatclass.ipynb`.
