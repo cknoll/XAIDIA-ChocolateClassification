@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import tqdm
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms, models
@@ -518,10 +519,25 @@ def show_misclassified_images(misclassified_images, num_images=20):
     plt.show()
 
 
-def make_predictions(model, device, folder_path, transform, labels_names, output_csv='predictions.csv', save_images=True):
+def make_predictions(
+    model,
+    device,
+    folder_path,
+    transform,
+    labels_names,
+    output_csv_path: str = "predictions.csv",
+    save_images: bool = True,
+    limit: int = None,
+    plot: bool = False,
+):
+    """
+    Apply model to every image in the folder; If save_images == True → copy images to class-named directories.
+    """
 
     # Get list of image files in the folder
     image_files = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    image_files.sort()
+    image_files = image_files[:limit]
     predictions = []
 
     # Create folders for each label (from 1 to 9) if save_images is True
@@ -532,7 +548,7 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
     model.to(device)
     model.eval()  # Set model to evaluation mode
 
-    for image_file in image_files:
+    for image_file in tqdm.tqdm(image_files):
         # Load and preprocess the image
         img_path = os.path.join(folder_path, image_file)
         image = Image.open(img_path).convert('RGB')
@@ -553,8 +569,8 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
 
     # Convert the predictions to a DataFrame and save as CSV with proper encoding for German letters
     df = pd.DataFrame(predictions)
-    df.to_csv(output_csv, index=False, encoding='utf-8-sig')
-    print(f"Predictions saved to {output_csv}")
+    df.to_csv(output_csv_path, index=False, encoding='utf-8-sig')
+    print(f"Predictions saved to {output_csv_path}")
 
     # Save the images in folders corresponding to each label (from 1 to 9)
     if save_images:
@@ -567,49 +583,41 @@ def make_predictions(model, device, folder_path, transform, labels_names, output
                     cv2.imwrite(save_path, img)
 
     # After saving CSV and images, display the images with predicted labels
-    for image_file, predicted_labels in zip(image_files, df[labels_names].values):
-        # Load the image and resize it
-        img_path = os.path.join(folder_path, image_file)
-        img = cv2.imread(img_path)
-        img = cv2.resize(img, (100, 400))  # Resize to (width=100, height=400)
+    if plot:
+        for image_file, predicted_labels in zip(image_files, df[labels_names].values):
+            # Load the image and resize it
+            img_path = os.path.join(folder_path, image_file)
+            img = cv2.imread(img_path)
+            img = cv2.resize(img, (100, 400))  # Resize to (width=100, height=400)
 
-        # Create a canvas for the image and text
-        canvas_width = 400
-        canvas_height = img.shape[0] + 100
-        canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255  # White background
+            # Create a canvas for the image and text
+            canvas_width = 400
+            canvas_height = img.shape[0] + 100
+            canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255  # White background
 
-        # Center the image on the canvas
-        x_offset = (canvas_width - img.shape[1]) // 2
-        canvas[:img.shape[0], x_offset:x_offset + img.shape[1]] = img
+            # Center the image on the canvas
+            x_offset = (canvas_width - img.shape[1]) // 2
+            canvas[:img.shape[0], x_offset:x_offset + img.shape[1]] = img
 
-        # Annotate with the predicted labels
-        annotated_text = ", ".join([label for label, value in zip(labels_names, predicted_labels) if value == 1])
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.6
-        thickness = 1
-        text_size = cv2.getTextSize(annotated_text, font, font_scale, thickness)[0]
-        text_x = (canvas_width - text_size[0]) // 2  # Center the text horizontally
-        text_y = img.shape[0] + 60  # Position the text 60 pixels below the image
+            # Annotate with the predicted labels
+            annotated_text = ", ".join([label for label, value in zip(labels_names, predicted_labels) if value == 1])
 
-        cv2.putText(canvas, annotated_text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+            # TODO: handle special characters e.g. german Umlauts
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.6
+            thickness = 1
+            text_size = cv2.getTextSize(annotated_text, font, font_scale, thickness)[0]
+            text_x = (canvas_width - text_size[0]) // 2  # Center the text horizontally
+            text_y = img.shape[0] + 60  # Position the text 60 pixels below the image
 
-        # Display the image with the labels
-        cv2.imshow('Predictions', canvas)
+            cv2.putText(canvas, annotated_text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
 
-        # Wait for the user to press a key
-        key = cv2.waitKey(0)  # Wait indefinitely for a key press
-        if key == ord('q'):  # Press 'q' to quit the display
-            print("Display canceled by user.")
-            break
-
-    # Close the OpenCV window
-    cv2.destroyAllWindows()
+            # Display the image with the labels
+            img_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+            plt.imshow(img_rgb)
+            plt.show()
 
     return df
-
-
-
-
 
 
 # def make_predictions(model, device, folder_path, transform, labels_names, output_csv='predictions.csv'):
