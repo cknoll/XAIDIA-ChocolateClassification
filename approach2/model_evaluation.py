@@ -112,6 +112,8 @@ class Manager:
         # Get list of image files in the folder
         # filenames
         self.img_fnames_for_prediction = [f for f in os.listdir(self.input_image_dir_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+        self.img_fnames_for_prediction.sort()
+        self.img_fnames_for_prediction = self.img_fnames_for_prediction[:limit]
 
         # full paths
         self.img_fpaths_for_prediction = [pjoin(self.input_image_dir_path, img_fname) for img_fname  in self.img_fnames_for_prediction]
