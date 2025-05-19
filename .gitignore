@@ -4,3 +4,7 @@
 predict_inputs/*
 classification_models/*
 labels/*
+gradcam_results*
+requirements-freeze.txt
+results/*
+predictions*csv
