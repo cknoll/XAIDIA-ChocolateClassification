@@ -18,8 +18,12 @@ from torch.utils.data import Dataset, random_split, DataLoader
 from torch.utils.data.sampler import Sampler
 import torch.optim as optim
 from torchvision import transforms, models
-# from mlcm import mlcm
 
+# pip install grad-cam
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+
+# from mlcm import mlcm
 
 
 CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -56,12 +60,12 @@ label_names = [
 
 class Manager:
 
-    def __inti__(self):
+    def __init__(self, input_image_dir_path: str = None, limit: int = None):
         pass
         self.metadata: dict = None
         self.model_path = None
 
-
+        self._set_input_image_dir_paths(input_image_dir_path, limit)
 
     def load_model(self, model_path):
         """
@@ -69,7 +73,6 @@ class Manager:
         """
 
         self.model_path = model_path
-
 
         # Load the model, optimizer, and metadata
         # model, optimizer, metadata = clm.load_model_with_metadata(model_path, device)
@@ -93,30 +96,37 @@ class Manager:
         self.val_dataset = torch.utils.data.Subset(self.loaded_dataset, val_indices)
         val_loader = DataLoader(self.val_dataset, batch_size=32, shuffle=False)
 
-
     def plot_training_curves(self):
         # Plot training and validation losses
         clm.plot_losses(self.metadata['train_losses'], self.metadata['val_losses'])
 
-
-    def make_predictions(self, input_image_dir_path=None, limit=None, display=False):
+    def _set_input_image_dir_paths(self, input_image_dir_path, limit) -> None:
 
         if input_image_dir_path is None:
             input_image_dir_path = pjoin(PARENT_DIR, "predict_inputs")
 
         self.input_image_dir_path = input_image_dir_path
 
-        # following code is based on clm.make_predictions
-
-
         # Get list of image files in the folder
         # filenames
-        self.img_fnames_for_prediction = [f for f in os.listdir(self.input_image_dir_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+        self.img_fnames_for_prediction = [
+            f for f in os.listdir(self.input_image_dir_path) if f.endswith((".png", ".jpg", ".jpeg"))
+        ]
         self.img_fnames_for_prediction.sort()
         self.img_fnames_for_prediction = self.img_fnames_for_prediction[:limit]
 
         # full paths
-        self.img_fpaths_for_prediction = [pjoin(self.input_image_dir_path, img_fname) for img_fname  in self.img_fnames_for_prediction]
+        self.img_fpaths_for_prediction = [
+            pjoin(self.input_image_dir_path, img_fname) for img_fname in self.img_fnames_for_prediction
+        ]
+
+
+    def make_predictions(self, input_image_dir_path=None, limit=None, display=False):
+
+        self._set_input_image_dir_paths(input_image_dir_path, limit)
+
+        # following code is based on clm.make_predictions
+
         self.predictions = []
         self.outputs = []
         torch.set_printoptions(sci_mode=False, precision=4)
@@ -178,9 +188,6 @@ class Manager:
         img_np = img_tensor.cpu().numpy().transpose(1, 2, 0)
         return img_np
 
-
-
-
     def display_prediction(self, img_path, annotated_text):
         img = cv2.imread(img_path)
         img = cv2.resize(img, (100, 400))  # Resize to (width=100, height=400)
@@ -212,3 +219,54 @@ class Manager:
         if key == ord('q'):  # Press 'q' to quit the display
             print("Display canceled by user.")
             return "break"
+
+    def get_label_str(self, img_tensor) -> str:
+        with torch.no_grad():
+            image_outputs = self.model(img_tensor)
+            predicted_probs = torch.sigmoid(image_outputs)  # Apply sigmoid for multi-label classification
+            predicted_num_labels = (predicted_probs > 0.5).int()  # Convert probabilities to binary predictions
+
+        predicted_num_labels = [int(elt) for elt in predicted_num_labels.cpu().numpy().flatten()]
+
+        res = []
+        # print(predicted_probs)
+        # print(predicted_num_labels)
+        for ln, num_label, prob in zip(
+            label_names, predicted_num_labels, predicted_probs.cpu().numpy().flatten()
+        ):
+            if num_label:
+                res.append(f"{ln} ({round(float(prob), 3)})")
+
+        res_str = "\n".join(res)
+        return res_str
+
+    def grad_cam_cell(self, cell_img_fpath):
+        # usually the last convolutional layer
+        cam = GradCAM(model=self.model, target_layers=[self.model.conv2])
+        # Prepare the target
+        # targets = [ClassifierOutputTarget(class_idx)]
+        # q = m.load_and_preprocess_image(img_fpath)
+
+        img_tensor = self.load_and_preprocess_image(cell_img_fpath)
+        label_str = self.get_label_str(img_tensor)
+
+        grayscale_cam = cam(input_tensor=img_tensor, targets=None)
+
+        cmap_cam = plt.cm.viridis(grayscale_cam)[0, :, : , :3]
+
+        image_np = self.np_img_from_tensor(img_tensor)
+
+        # note  cv2.resize takes x dimension (col index) first
+        # image1 = me.cv2.resize(image, (25, 100)) ##:i
+
+        # Overlay the heatmap on the original image
+        # cam_image = show_cam_on_image(image_np, grayscale_cam[0], use_rgb=True)
+
+        full_image = np.concatenate((image_np, cmap_cam), axis=1)
+        res_fpath = cell_img_fpath.replace("predict_inputs", "gradcam_results3")
+        dirpath, _ = os.path.split(res_fpath)
+        os.makedirs(dirpath, exist_ok=True)
+        plt.title(label_str)
+        plt.imshow(full_image)
+        plt.savefig(res_fpath, bbox_inches="tight")
+        plt.close()
